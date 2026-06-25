@@ -13,7 +13,6 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.resource.language.I18n;
 import net.minecraft.client.toast.SystemToast;
@@ -28,6 +27,7 @@ import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.Identifier;
 import zabi.minecraft.nbttooltip.config.ModConfig;
 import zabi.minecraft.nbttooltip.parse_engine.NbtTagParser;
 
@@ -40,10 +40,14 @@ public class NBTTooltip implements ClientModInitializer {
 
 	public static final int WAITTIME_BEFORE_FAST_SCROLL = 10;
 
-	public static KeyBinding COPY_TO_CLIPBOARD = new KeyBinding("key.nbttooltip.copy", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT, "key.category.nbttooltip");
-	public static KeyBinding TOGGLE_NBT = new KeyBinding("key.nbttooltip.toggle", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_LEFT, "key.category.nbttooltip");
-	public static KeyBinding SCROLL_UP = new KeyBinding("key.nbttooltip.scroll_up", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UP, "key.category.nbttooltip");
-	public static KeyBinding SCROLL_DOWN = new KeyBinding("key.nbttooltip.scroll_down", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_DOWN, "key.category.nbttooltip");
+	// Since 1.21.9 key categories are KeyBinding.Category objects (registered on creation),
+	// not plain translation-key strings. Its label resolves to "key.category.nbttooltip.general".
+	public static final KeyBinding.Category CATEGORY = KeyBinding.Category.create(Identifier.of("nbttooltip", "general"));
+
+	public static KeyBinding COPY_TO_CLIPBOARD = new KeyBinding("key.nbttooltip.copy", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT, CATEGORY);
+	public static KeyBinding TOGGLE_NBT = new KeyBinding("key.nbttooltip.toggle", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_LEFT, CATEGORY);
+	public static KeyBinding SCROLL_UP = new KeyBinding("key.nbttooltip.scroll_up", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UP, CATEGORY);
+	public static KeyBinding SCROLL_DOWN = new KeyBinding("key.nbttooltip.scroll_down", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_DOWN, CATEGORY);
 
 	public static boolean flipflop_key_copy = false;
 	public static boolean flipflop_key_toggle = false;
@@ -71,10 +75,10 @@ public class NBTTooltip implements ClientModInitializer {
 
 		if (autoscroll_locks > 0) autoscroll_locks--;
 
-		if (!Screen.hasShiftDown() && !isPressed(mc, SCROLL_DOWN) && !isPressed(mc, SCROLL_UP) && autoscroll_locks == 0) {
+		if (!hasShiftDown() && !isPressed(mc, SCROLL_DOWN) && !isPressed(mc, SCROLL_UP) && autoscroll_locks == 0) {
 			NBTTooltip.ticks++;
 			int factor = 1;
-			if (Screen.hasAltDown()) {
+			if (hasAltDown()) {
 				factor = 4;
 			}
 			if (NBTTooltip.ticks >= ModConfig.INSTANCE.ticksBeforeScroll / factor) {
@@ -118,7 +122,24 @@ public class NBTTooltip implements ClientModInitializer {
 	}
 
 	private static boolean isPressed(MinecraftClient mc, KeyBinding key) {
-		return !key.isUnbound() && InputUtil.isKeyPressed(mc.getWindow().getHandle(), InputUtil.fromTranslationKey(key.getBoundKeyTranslationKey()).getCode());
+		return !key.isUnbound() && InputUtil.isKeyPressed(mc.getWindow(), InputUtil.fromTranslationKey(key.getBoundKeyTranslationKey()).getCode());
+	}
+
+	// Replacements for the Screen.has*Down() statics removed in 1.21.9+.
+	private static boolean isKeyHeld(int keyCode) {
+		return InputUtil.isKeyPressed(MinecraftClient.getInstance().getWindow(), keyCode);
+	}
+
+	private static boolean hasShiftDown() {
+		return isKeyHeld(InputUtil.GLFW_KEY_LEFT_SHIFT) || isKeyHeld(InputUtil.GLFW_KEY_RIGHT_SHIFT);
+	}
+
+	private static boolean hasControlDown() {
+		return isKeyHeld(InputUtil.GLFW_KEY_LEFT_CONTROL) || isKeyHeld(InputUtil.GLFW_KEY_RIGHT_CONTROL);
+	}
+
+	private static boolean hasAltDown() {
+		return isKeyHeld(InputUtil.GLFW_KEY_LEFT_ALT) || isKeyHeld(InputUtil.GLFW_KEY_RIGHT_ALT);
 	}
 
 	public static ArrayList<Text> transformTtip(ArrayList<Text> ttip, int lines) {
@@ -169,7 +190,7 @@ public class NBTTooltip implements ClientModInitializer {
 		if (ModConfig.INSTANCE.triggerType.shouldShowTooltip(context, type)) {
 			if (autoscroll_locks > 0) autoscroll_locks = 2;
 			int lines = ModConfig.INSTANCE.maxLinesShown;
-			if (ModConfig.INSTANCE.ctrlSuppressesRest && Screen.hasControlDown()) {
+			if (ModConfig.INSTANCE.ctrlSuppressesRest && hasControlDown()) {
 				lines += list.size();
 				list.clear();
 			} else {
