@@ -1,5 +1,8 @@
 plugins {
-	id 'fabric-loom' version '1.11-SNAPSHOT'
+	// 26.1+ uses the new non-remapping Loom plugin (Minecraft is unobfuscated;
+	// Yarn and Mojang ProGuard mappings are gone). See:
+	// https://fabricmc.net/2026/03/14/261.html
+	id 'net.fabricmc.fabric-loom' version '1.17.12'
 	id 'maven-publish'
 }
 
@@ -11,11 +14,6 @@ base {
 }
 
 repositories {
-    mavenLocal()
-    maven {
-        name = "CurseForge"
-        url = "https://minecraft.curseforge.com/api/maven/"
-    }
     maven {
     	name = "ModMenu"
     	url = "https://maven.terraformersmc.com/releases/"
@@ -27,30 +25,28 @@ repositories {
 }
 
 dependencies {
+	// No mappings: Minecraft 26.x ships unobfuscated, so Loom does not remap.
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
-	mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
-	
-	//Fabric
-	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
-	
 
-	// Deps
-	modApi("com.terraformersmc:modmenu:${project.modmenu_version}")  {
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+
+	// Deps (no longer remapped -> plain implementation)
+	implementation("com.terraformersmc:modmenu:${project.modmenu_version}")  {
       exclude module: 'fabric-api'
       exclude module: 'config-2'
       exclude module: 'cloth-config-fabric'
       exclude module: 'roughlyenoughitems-api'
     }
-    
-	modApi("me.shedaniel.cloth:cloth-config-fabric:${project.clothconfig_version}") {
+
+	implementation("me.shedaniel.cloth:cloth-config-fabric:${project.clothconfig_version}") {
       exclude module: 'fabric-api'
       exclude module: 'config-2'
       exclude module: 'cloth-config-fabric'
       exclude module: 'roughlyenoughitems-api'
     }
-    
-	// //Bundling
+
+	// Bundle Cloth Config into the released jar (jar-in-jar)
 	include "me.shedaniel.cloth:cloth-config-fabric:${project.clothconfig_version}"
 }
 
@@ -63,32 +59,27 @@ processResources {
 }
 
 tasks.withType(JavaCompile).configureEach  {
-	it.options.release = 21
+	it.options.release = 25
 }
 
 
 java {
 	withSourcesJar()
 
-	sourceCompatibility = JavaVersion.VERSION_21
-	targetCompatibility = JavaVersion.VERSION_21
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
 }
 
 jar {
 	from("LICENSE") {
-		rename { "${it}_${project.archivesBaseName}"}
+		rename { "${it}_${project.archives_base_name}"}
 	}
 }
 
 publishing {
 	publications {
 		mavenJava(MavenPublication) {
-			artifact(remapJar) {
-				builtBy remapJar
-			}
-			artifact(sourcesJar) {
-				builtBy remapSourcesJar
-			}
+			from components.java
 		}
 	}
 
